@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -97,6 +97,7 @@ struct ScanCtx {
     scanned: u64,
     app: AppHandle,
     label: &'static str,
+    exclude: HashSet<String>,
 }
 
 impl ScanCtx {
@@ -145,6 +146,12 @@ impl ScanCtx {
                 },
             );
         }
+    }
+
+    // True when this directory is on the user's exclude list (case-insensitive).
+    fn is_excluded(&self, path: &Path) -> bool {
+        !self.exclude.is_empty()
+            && self.exclude.contains(&path.to_string_lossy().to_lowercase())
     }
 }
 
@@ -196,6 +203,9 @@ fn walk_files(ctx: &mut ScanCtx, dir: &Path) -> bool {
             continue;
         }
         if md.is_dir() {
+            if ctx.is_excluded(&path) {
+                continue;
+            }
             if !walk_files(ctx, &path) {
                 return false;
             }
@@ -236,6 +246,9 @@ fn walk_folders(ctx: &mut ScanCtx, dir: &Path, dir_modified: Option<i64>) -> (u6
             continue;
         }
         if md.is_dir() {
+            if ctx.is_excluded(&path) {
+                continue;
+            }
             let (sub, keep_going) = walk_folders(ctx, &path, mtime_millis(&md));
             total += sub;
             if !keep_going {
@@ -278,9 +291,11 @@ fn run_scan(
     limit: usize,
     mode: String,
     roots: Vec<String>,
+    exclude: Vec<String>,
 ) -> ScanResult {
     let folder_mode = mode == "folders";
     let label = if folder_mode { "folders" } else { "files" };
+    let exclude: HashSet<String> = exclude.into_iter().map(|p| p.to_lowercase()).collect();
     let mut ctx = ScanCtx {
         limit,
         control,
@@ -288,6 +303,7 @@ fn run_scan(
         scanned: 0,
         app,
         label,
+        exclude,
     };
 
     for drive in roots {
@@ -330,6 +346,7 @@ async fn scan(
     limit: usize,
     mode: String,
     root: Option<String>,
+    exclude: Vec<String>,
 ) -> Result<ScanResult, String> {
     // A specific folder narrows the scan; otherwise sweep every drive.
     let roots = match root {
@@ -341,10 +358,11 @@ async fn scan(
         *control.0.lock().unwrap() = Some(ctrl.clone());
     }
     let app2 = app.clone();
-    let result =
-        tauri::async_runtime::spawn_blocking(move || run_scan(app2, ctrl, limit, mode, roots))
-            .await
-            .map_err(|e| e.to_string())?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_scan(app2, ctrl, limit, mode, roots, exclude)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     Ok(result)
 }
 
