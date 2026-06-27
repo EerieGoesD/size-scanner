@@ -177,6 +177,21 @@ fn mtime_millis(md: &fs::Metadata) -> Option<i64> {
         .map(|d| d.as_millis() as i64)
 }
 
+// On macOS the writable Data volume is presented BOTH at the firmlinked
+// top-level paths (/Users, /Applications, ...) AND at /System/Volumes/Data, so
+// a scan of "/" would count everything twice (the cause of totals larger than
+// the physical disk). Skip that duplicate mount. No-op on other platforms.
+fn is_volume_duplicate(_path: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        _path == Path::new("/System/Volumes/Data")
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
 // Largest-files mode: every file competes for the top-N by its own size.
 fn walk_files(ctx: &mut ScanCtx, dir: &Path) -> bool {
     if !ctx.check() {
@@ -203,7 +218,7 @@ fn walk_files(ctx: &mut ScanCtx, dir: &Path) -> bool {
             continue;
         }
         if md.is_dir() {
-            if ctx.is_excluded(&path) {
+            if ctx.is_excluded(&path) || is_volume_duplicate(&path) {
                 continue;
             }
             if !walk_files(ctx, &path) {
@@ -246,7 +261,7 @@ fn walk_folders(ctx: &mut ScanCtx, dir: &Path, dir_modified: Option<i64>) -> (u6
             continue;
         }
         if md.is_dir() {
-            if ctx.is_excluded(&path) {
+            if ctx.is_excluded(&path) || is_volume_duplicate(&path) {
                 continue;
             }
             let (sub, keep_going) = walk_folders(ctx, &path, mtime_millis(&md));
