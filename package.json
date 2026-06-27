@@ -1,0 +1,15 @@
+{
+  "name": "size-scanner",
+  "version": "1.0.0",
+  "description": "Find the largest files and folders on your PC",
+  "author": "EERIE",
+  "license": "UNLICENSED",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

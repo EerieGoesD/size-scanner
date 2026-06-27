@@ -1,0 +1,10 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# MSIX packaging: ignore the generated package and the staged binaries/assets.
+# AppxManifest.xml (your Store identity/config) stays tracked.
+*.msix
+store-msix/layout/*.exe
+store-msix/layout/Assets/
