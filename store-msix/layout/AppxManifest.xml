@@ -8,7 +8,7 @@
   <Identity
     Name="20715EerieGoesD.SizeScanner"
     Publisher="CN=A2A89A47-0B2B-4C32-B85C-9753888A9FFC"
-    Version="1.0.0.0"
+    Version="1.0.1.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
